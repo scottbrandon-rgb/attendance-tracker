@@ -32,22 +32,6 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function StatusBadge({ status }: { status: AttendanceStatus | string }) {
-  const styles: Record<string, string> = {
-    Present: 'bg-green-100 text-green-800 border-green-200',
-    Late: 'bg-amber-100 text-amber-800 border-amber-200',
-    Absent: 'bg-red-100 text-red-800 border-red-200',
-  };
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-        styles[status] || 'bg-gray-100 text-gray-700 border-gray-200'
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
 
 export default function History({ classId }: HistoryProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -56,7 +40,7 @@ export default function History({ classId }: HistoryProps) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
-  const [syncing, setSyncing] = useState<Set<string>>(new Set());
+  const [savingError, setSavingError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -145,27 +129,19 @@ export default function History({ classId }: HistoryProps) {
 
   const changeStatus = async (record: AttendanceRecord, newStatus: AttendanceStatus) => {
     const previousStatus = record.status;
-    // Optimistic update
+    setSavingError(null);
+    // Optimistic update — update status in place, record stays in the list
     setRecords(prev =>
       prev.map(r => r.id === record.id ? { ...r, status: newStatus } : r)
     );
-    setSyncing(prev => new Set(prev).add(record.id));
     try {
-      const updated = await updateAttendance(record.id, newStatus);
-      setRecords(prev =>
-        prev.map(r => r.id === record.id ? updated : r)
-      );
+      await updateAttendance(record.id, newStatus);
     } catch {
-      // Rollback
+      // Rollback on failure
       setRecords(prev =>
         prev.map(r => r.id === record.id ? { ...r, status: previousStatus } : r)
       );
-    } finally {
-      setSyncing(prev => {
-        const next = new Set(prev);
-        next.delete(record.id);
-        return next;
-      });
+      setSavingError('Failed to save status change. Please try again.');
     }
   };
 
@@ -248,6 +224,13 @@ export default function History({ classId }: HistoryProps) {
         </div>
       </div>
 
+      {savingError && (
+        <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-red-700 text-sm flex items-center justify-between">
+          {savingError}
+          <button onClick={() => setSavingError(null)} className="ml-3 underline hover:no-underline text-xs">Dismiss</button>
+        </div>
+      )}
+
       {filteredGroups.length === 0 && (
         <div className="text-center py-10 text-gray-500 text-sm">
           No records match your search.
@@ -311,7 +294,6 @@ export default function History({ classId }: HistoryProps) {
                   <tbody className="divide-y divide-gray-50">
                     {group.records.map(record => {
                       const member = record.memberId ? memberMap[record.memberId] : null;
-                      const isSyncing = syncing.has(record.id);
                       return (
                         <tr key={record.id} className="bg-white hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-2.5 text-gray-900 font-medium">
@@ -320,33 +302,23 @@ export default function History({ classId }: HistoryProps) {
                             )}
                           </td>
                           <td className="px-4 py-2.5">
-                            {isSyncing ? (
-                              <div className="flex items-center gap-2">
-                                <svg className="animate-spin h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                </svg>
-                                <StatusBadge status={record.status} />
-                              </div>
-                            ) : (
-                              <select
-                                value={record.status}
-                                onChange={e => changeStatus(record, e.target.value as AttendanceStatus)}
-                                className={`text-xs font-medium border rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${
-                                  record.status === 'Present'
-                                    ? 'bg-green-100 text-green-800 border-green-200'
-                                    : record.status === 'Absent'
-                                    ? 'bg-red-100 text-red-800 border-red-200'
-                                    : 'bg-amber-100 text-amber-800 border-amber-200'
-                                }`}
-                              >
-                                <option value="Present">Present</option>
-                                <option value="Absent">Absent</option>
-                                {record.status === 'Late' && (
-                                  <option value="Late">Late</option>
-                                )}
-                              </select>
-                            )}
+                            <select
+                              value={record.status}
+                              onChange={e => changeStatus(record, e.target.value as AttendanceStatus)}
+                              className={`text-xs font-medium border rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${
+                                record.status === 'Present'
+                                  ? 'bg-green-100 text-green-800 border-green-200'
+                                  : record.status === 'Absent'
+                                  ? 'bg-red-100 text-red-800 border-red-200'
+                                  : 'bg-amber-100 text-amber-800 border-amber-200'
+                              }`}
+                            >
+                              <option value="Present">Present</option>
+                              <option value="Absent">Absent</option>
+                              {record.status === 'Late' && (
+                                <option value="Late">Late</option>
+                              )}
+                            </select>
                           </td>
                         </tr>
                       );
