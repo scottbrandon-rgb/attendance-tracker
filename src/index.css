@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .btn-status {
+    @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border;
+  }
+  .btn-status-present {
+    @apply btn-status border-green-200 text-green-700 hover:bg-green-50;
+  }
+  .btn-status-present-active {
+    @apply btn-status border-green-500 bg-green-100 text-green-800 ring-1 ring-green-500;
+  }
+  .btn-status-late {
+    @apply btn-status border-amber-200 text-amber-700 hover:bg-amber-50;
+  }
+  .btn-status-late-active {
+    @apply btn-status border-amber-500 bg-amber-100 text-amber-800 ring-1 ring-amber-500;
+  }
+  .btn-status-absent {
+    @apply btn-status border-red-200 text-red-700 hover:bg-red-50;
+  }
+  .btn-status-absent-active {
+    @apply btn-status border-red-500 bg-red-100 text-red-800 ring-1 ring-red-500;
+  }
+}
