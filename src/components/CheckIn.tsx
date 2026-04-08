@@ -25,7 +25,7 @@ export default function CheckIn({ classId }: CheckInProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [statusMap, setStatusMap] = useState<StatusMap>({});
   const [loadingMembers, setLoadingMembers] = useState(true);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
   const [errorMembers, setErrorMembers] = useState<string | null>(null);
   const [errorAttendance, setErrorAttendance] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
