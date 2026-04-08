@@ -355,8 +355,6 @@ export default function CheckIn({ classId }: CheckInProps) {
                     className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                       currentStatus === 'Present'
                         ? 'bg-green-500'
-                        : currentStatus === 'Late'
-                        ? 'bg-amber-500'
                         : currentStatus === 'Absent'
                         ? 'bg-red-400'
                         : 'bg-gray-200'
@@ -382,17 +380,6 @@ export default function CheckIn({ classId }: CheckInProps) {
                   }
                 >
                   Present
-                </button>
-                <button
-                  onClick={() => markStatus(member, 'Late')}
-                  disabled={isSyncing}
-                  className={
-                    currentStatus === 'Late'
-                      ? 'btn-status-late-active'
-                      : 'btn-status-late'
-                  }
-                >
-                  Late
                 </button>
                 <button
                   onClick={() => markStatus(member, 'Absent')}

@@ -6,15 +6,18 @@ import {
   updateMember,
   deleteMember,
   type Member,
+  type Class,
 } from '../lib/api';
 
 interface RosterProps {
   classId: string;
+  classes: Class[];
 }
 
 interface MemberFormData {
   name: string;
   notes: string;
+  classId: string;
 }
 
 type ModalMode = 'add' | 'edit';
@@ -25,13 +28,13 @@ interface ModalState {
   member?: Member;
 }
 
-export default function Roster({ classId }: RosterProps) {
+export default function Roster({ classId, classes }: RosterProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<ModalState>({ open: false, mode: 'add' });
-  const [formData, setFormData] = useState<MemberFormData>({ name: '', notes: '' });
+  const [formData, setFormData] = useState<MemberFormData>({ name: '', notes: '', classId });
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
@@ -55,13 +58,13 @@ export default function Roster({ classId }: RosterProps) {
   }, [loadMembers]);
 
   const openAddModal = () => {
-    setFormData({ name: '', notes: '' });
+    setFormData({ name: '', notes: '', classId });
     setFormError(null);
     setModal({ open: true, mode: 'add' });
   };
 
   const openEditModal = (member: Member) => {
-    setFormData({ name: member.name, notes: member.notes });
+    setFormData({ name: member.name, notes: member.notes, classId: member.classId || classId });
     setFormError(null);
     setModal({ open: true, mode: 'edit', member });
   };
@@ -85,15 +88,23 @@ export default function Roster({ classId }: RosterProps) {
       if (modal.mode === 'add') {
         const newMember = await createMember({
           name: formData.name.trim(),
-          classId,
+          classId: formData.classId,
           notes: formData.notes.trim() || undefined,
         });
-        setMembers(prev => [...prev, newMember].sort((a, b) => a.name.localeCompare(b.name)));
+        // Only add to this view if they were added to the current class
+        if (newMember.classId === classId) {
+          setMembers(prev => [...prev, newMember].sort((a, b) => a.name.localeCompare(b.name)));
+        }
       } else if (modal.mode === 'edit' && modal.member) {
         const updated = await updateMember(modal.member.id, {
           name: formData.name.trim(),
           notes: formData.notes.trim(),
+          classId: formData.classId,
         });
+        // If moved to a different class, remove from this view
+        if (updated.classId !== classId) {
+          setMembers(prev => prev.filter(m => m.id !== updated.id));
+        }
         setMembers(prev =>
           prev
             .map(m => (m.id === updated.id ? updated : m))
@@ -275,6 +286,20 @@ export default function Roster({ classId }: RosterProps) {
                   autoFocus
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Class <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.classId}
+                  onChange={e => setFormData(prev => ({ ...prev, classId: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

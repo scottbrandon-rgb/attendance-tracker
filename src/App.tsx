@@ -149,7 +149,7 @@ export default function App() {
                     <CheckIn classId={activeClassId} />
                   )}
                   {activeTab === 'roster' && (
-                    <Roster classId={activeClassId} />
+                    <Roster classId={activeClassId} classes={classes} />
                   )}
                   {activeTab === 'history' && (
                     <History classId={activeClassId} />
