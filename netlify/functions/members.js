@@ -10,26 +10,16 @@ const CORS_HEADERS = {
 };
 
 function errorResponse(statusCode, message) {
-  return {
-    statusCode,
-    headers: CORS_HEADERS,
-    body: JSON.stringify({ error: message }),
-  };
+  return { statusCode, headers: CORS_HEADERS, body: JSON.stringify({ error: message }) };
 }
 
 function successResponse(data, statusCode = 200) {
-  return {
-    statusCode,
-    headers: CORS_HEADERS,
-    body: JSON.stringify(data),
-  };
+  return { statusCode, headers: CORS_HEADERS, body: JSON.stringify(data) };
 }
 
 async function airtableFetch(url, options = {}) {
   const pat = process.env.AIRTABLE_PAT;
-  if (!pat) {
-    throw new Error('AIRTABLE_PAT environment variable is not set');
-  }
+  if (!pat) throw new Error('AIRTABLE_PAT environment variable is not set');
 
   const response = await fetch(url, {
     ...options,
@@ -41,12 +31,9 @@ async function airtableFetch(url, options = {}) {
   });
 
   const data = await response.json();
-
   if (!response.ok) {
-    const message = data?.error?.message || `Airtable API error: ${response.status}`;
-    throw new Error(message);
+    throw new Error(data?.error?.message || `Airtable API error: ${response.status}`);
   }
-
   return data;
 }
 
@@ -63,36 +50,35 @@ function mapRecord(record) {
 async function getAllRecords(url) {
   let allRecords = [];
   let offset = null;
-
   do {
     const pageUrl = offset ? `${url}&offset=${encodeURIComponent(offset)}` : url;
     const data = await airtableFetch(pageUrl);
     allRecords = allRecords.concat(data.records || []);
     offset = data.offset || null;
   } while (offset);
-
   return allRecords;
 }
 
 export const handler = async (event) => {
-  // Handle preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: CORS_HEADERS, body: '' };
-  }
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS_HEADERS, body: '' };
 
   const params = event.queryStringParameters || {};
 
   // GET
   if (event.httpMethod === 'GET') {
     try {
-      let url = `${AIRTABLE_BASE_URL}?fields%5B%5D=fld32Yk8Z3uFeVZSt&fields%5B%5D=fldLEHYmhHlWr5HXJ&fields%5B%5D=fldqSvBdeXs6VL4jy&sort%5B0%5D%5Bfield%5D=fld32Yk8Z3uFeVZSt&sort%5B0%5D%5Bdirection%5D=asc`;
+      const url = `${AIRTABLE_BASE_URL}?returnFieldsByFieldId=true&fields%5B%5D=fld32Yk8Z3uFeVZSt&fields%5B%5D=fldLEHYmhHlWr5HXJ&fields%5B%5D=fldqSvBdeXs6VL4jy&sort%5B0%5D%5Bfield%5D=fld32Yk8Z3uFeVZSt&sort%5B0%5D%5Bdirection%5D=asc`;
 
+      let records = await getAllRecords(url);
+
+      // Filter by classId client-side — ARRAYJOIN returns linked record names not IDs
       if (params.classId) {
-        const formula = encodeURIComponent(`SEARCH("${params.classId}",ARRAYJOIN({fldqSvBdeXs6VL4jy}))`);
-        url += `&filterByFormula=${formula}`;
+        records = records.filter((r) => {
+          const classField = r.fields['fldqSvBdeXs6VL4jy'];
+          return Array.isArray(classField) && classField.includes(params.classId);
+        });
       }
 
-      const records = await getAllRecords(url);
       return successResponse(records.map(mapRecord));
     } catch (err) {
       console.error('members.js GET error:', err);
@@ -100,30 +86,20 @@ export const handler = async (event) => {
     }
   }
 
-  // POST — create member
+  // POST
   if (event.httpMethod === 'POST') {
     try {
-      let body;
-      try {
-        body = JSON.parse(event.body || '{}');
-      } catch {
-        return errorResponse(400, 'Invalid JSON body');
-      }
-
+      const body = JSON.parse(event.body || '{}');
       const { name, classId, notes } = body;
-      if (!name || !classId) {
-        return errorResponse(400, 'name and classId are required');
-      }
+      if (!name || !classId) return errorResponse(400, 'name and classId are required');
 
       const fields = {
         fld32Yk8Z3uFeVZSt: name,
         fldqSvBdeXs6VL4jy: [classId],
       };
-      if (notes) {
-        fields['fldLEHYmhHlWr5HXJ'] = notes;
-      }
+      if (notes) fields['fldLEHYmhHlWr5HXJ'] = notes;
 
-      const data = await airtableFetch(AIRTABLE_BASE_URL, {
+      const data = await airtableFetch(`${AIRTABLE_BASE_URL}?returnFieldsByFieldId=true`, {
         method: 'POST',
         body: JSON.stringify({ fields }),
       });
@@ -135,27 +111,19 @@ export const handler = async (event) => {
     }
   }
 
-  // PATCH — update member
+  // PATCH
   if (event.httpMethod === 'PATCH') {
     try {
-      const id = params.id;
-      if (!id) {
-        return errorResponse(400, 'id query parameter is required');
-      }
+      const { id } = params;
+      if (!id) return errorResponse(400, 'id query parameter is required');
 
-      let body;
-      try {
-        body = JSON.parse(event.body || '{}');
-      } catch {
-        return errorResponse(400, 'Invalid JSON body');
-      }
-
+      const body = JSON.parse(event.body || '{}');
       const fields = {};
       if (body.name !== undefined) fields['fld32Yk8Z3uFeVZSt'] = body.name;
       if (body.notes !== undefined) fields['fldLEHYmhHlWr5HXJ'] = body.notes;
       if (body.classId !== undefined) fields['fldqSvBdeXs6VL4jy'] = [body.classId];
 
-      const data = await airtableFetch(`${AIRTABLE_BASE_URL}/${id}`, {
+      const data = await airtableFetch(`${AIRTABLE_BASE_URL}/${id}?returnFieldsByFieldId=true`, {
         method: 'PATCH',
         body: JSON.stringify({ fields }),
       });
@@ -167,25 +135,17 @@ export const handler = async (event) => {
     }
   }
 
-  // DELETE — delete member
+  // DELETE
   if (event.httpMethod === 'DELETE') {
     try {
-      const id = params.id;
-      if (!id) {
-        return errorResponse(400, 'id query parameter is required');
-      }
+      const { id } = params;
+      if (!id) return errorResponse(400, 'id query parameter is required');
 
-      await airtableFetch(`${AIRTABLE_BASE_URL}/${id}`, {
-        method: 'DELETE',
-      });
-
+      await airtableFetch(`${AIRTABLE_BASE_URL}/${id}`, { method: 'DELETE' });
       return successResponse({ deleted: true, id });
     } catch (err) {
       console.error('members.js DELETE error:', err);
-      // If record is already gone, treat as success
-      if (err.message && err.message.includes('NOT_FOUND')) {
-        return successResponse({ deleted: true, id: params.id });
-      }
+      if (err.message?.includes('NOT_FOUND')) return successResponse({ deleted: true, id: params.id });
       return errorResponse(500, err.message || 'Internal server error');
     }
   }
