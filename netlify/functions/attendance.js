@@ -39,15 +39,30 @@ async function airtableFetch(url, options = {}) {
   return data;
 }
 
+// Airtable linked-record fields may return plain record ID strings ["recXXX"]
+// or objects [{ id: "recXXX", name: "..." }] depending on API version/context.
+// This helper handles both formats.
+function extractId(fieldValue) {
+  if (!Array.isArray(fieldValue) || fieldValue.length === 0) return null;
+  const first = fieldValue[0];
+  return typeof first === 'string' ? first : (first?.id || null);
+}
+
+// Single-select fields may return a plain string "Present" or an object
+// { id: "selXXX", name: "Present", color: "..." }. Handle both.
+function extractSelectName(fieldValue) {
+  if (!fieldValue) return '';
+  if (typeof fieldValue === 'string') return fieldValue;
+  return fieldValue.name || '';
+}
+
 function mapRecord(record) {
-  const memberField = record.fields['fldhRq7Uuie0tqj2x'];
-  const classField = record.fields['fldI1WQDhFZ4AAZFM'];
   return {
     id: record.id,
-    memberId: Array.isArray(memberField) && memberField.length > 0 ? memberField[0] : null,
-    classId: Array.isArray(classField) && classField.length > 0 ? classField[0] : null,
+    memberId: extractId(record.fields['fldhRq7Uuie0tqj2x']),
+    classId: extractId(record.fields['fldI1WQDhFZ4AAZFM']),
     date: record.fields['fldSGgN2v2vWaYgeS'] || '',
-    status: record.fields['fldsJsZjzUZ64Yr9g'] || '',
+    status: extractSelectName(record.fields['fldsJsZjzUZ64Yr9g']),
   };
 }
 
@@ -85,19 +100,19 @@ export const handler = async (event) => {
       const { classId, date } = params;
       if (!classId) return errorResponse(400, 'classId query parameter is required');
 
-      let url = `${AIRTABLE_BASE_URL}?returnFieldsByFieldId=true&fields%5B%5D=fldYippvtW53tKjVw&fields%5B%5D=fldSGgN2v2vWaYgeS&fields%5B%5D=fldsJsZjzUZ64Yr9g&fields%5B%5D=fldhRq7Uuie0tqj2x&fields%5B%5D=fldI1WQDhFZ4AAZFM&sort%5B0%5D%5Bfield%5D=fldSGgN2v2vWaYgeS&sort%5B0%5D%5Bdirection%5D=desc`;
-
-      // Filter by date in Airtable if provided (date is a simple field comparison, works fine)
-      if (date) {
-        url += `&filterByFormula=${encodeURIComponent(`{fldSGgN2v2vWaYgeS}="${date}"`)}`;
-      }
+      const url = `${AIRTABLE_BASE_URL}?returnFieldsByFieldId=true&fields%5B%5D=fldYippvtW53tKjVw&fields%5B%5D=fldSGgN2v2vWaYgeS&fields%5B%5D=fldsJsZjzUZ64Yr9g&fields%5B%5D=fldhRq7Uuie0tqj2x&fields%5B%5D=fldI1WQDhFZ4AAZFM&sort%5B0%5D%5Bfield%5D=fldSGgN2v2vWaYgeS&sort%5B0%5D%5Bdirection%5D=desc`;
 
       let records = await getAllRecords(url);
 
-      // Filter by classId client-side — ARRAYJOIN returns linked record names not IDs
+      // Filter by classId and date client-side — filterByFormula with field IDs is
+      // unreliable for linked/date fields and can silently return zero records.
       records = records.filter((r) => {
         const classField = r.fields['fldI1WQDhFZ4AAZFM'];
-        return Array.isArray(classField) && classField.includes(classId);
+        const classMatch = Array.isArray(classField)
+          ? classField.some(v => (typeof v === 'string' ? v : v?.id) === classId)
+          : false;
+        const dateMatch = date ? r.fields['fldSGgN2v2vWaYgeS'] === date : true;
+        return classMatch && dateMatch;
       });
 
       return successResponse(records.map(mapRecord));
