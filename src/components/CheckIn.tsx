@@ -332,71 +332,59 @@ export default function CheckIn({ classId }: CheckInProps) {
         )}
       </div>
 
-      {/* Member list */}
-      <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-        {members.map(member => {
-          const record = statusMap[member.id];
-          const currentStatus = record?.status;
-          const isSyncing = syncing.has(member.id);
+      {/* Member list — only show unmarked members */}
+      {members.filter(m => !statusMap[m.id]).length === 0 ? (
+        <div className="text-center py-10 text-gray-500 text-sm border border-gray-200 rounded-lg">
+          Everyone has been checked in for this date.
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+          {members.filter(m => !statusMap[m.id]).map(member => {
+            const isSyncing = syncing.has(member.id);
 
-          return (
-            <div
-              key={member.id}
-              className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                {isSyncing ? (
-                  <svg className="animate-spin h-4 w-4 text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                ) : (
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                      currentStatus === 'Present'
-                        ? 'bg-green-500'
-                        : currentStatus === 'Absent'
-                        ? 'bg-red-400'
-                        : 'bg-gray-200'
-                    }`}
-                  />
-                )}
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{member.name}</p>
-                  {member.notes && (
-                    <p className="text-xs text-gray-500 truncate">{member.notes}</p>
+            return (
+              <div
+                key={member.id}
+                className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {isSyncing ? (
+                    <svg className="animate-spin h-4 w-4 text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                  ) : (
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-gray-200" />
                   )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{member.name}</p>
+                    {member.notes && (
+                      <p className="text-xs text-gray-500 truncate">{member.notes}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
+                  <button
+                    onClick={() => markStatus(member, 'Present')}
+                    disabled={isSyncing}
+                    className="btn-status-present"
+                  >
+                    Present
+                  </button>
+                  <button
+                    onClick={() => markStatus(member, 'Absent')}
+                    disabled={isSyncing}
+                    className="btn-status-absent"
+                  >
+                    Absent
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
-                <button
-                  onClick={() => markStatus(member, 'Present')}
-                  disabled={isSyncing}
-                  className={
-                    currentStatus === 'Present'
-                      ? 'btn-status-present-active'
-                      : 'btn-status-present'
-                  }
-                >
-                  Present
-                </button>
-                <button
-                  onClick={() => markStatus(member, 'Absent')}
-                  disabled={isSyncing}
-                  className={
-                    currentStatus === 'Absent'
-                      ? 'btn-status-absent-active'
-                      : 'btn-status-absent'
-                  }
-                >
-                  Absent
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   getAttendance,
   getMembers,
+  updateAttendance,
   type AttendanceRecord,
   type Member,
   type AttendanceStatus,
@@ -55,6 +56,7 @@ export default function History({ classId }: HistoryProps) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -139,6 +141,32 @@ export default function History({ classId }: HistoryProps) {
       }
       return next;
     });
+  };
+
+  const changeStatus = async (record: AttendanceRecord, newStatus: AttendanceStatus) => {
+    const previousStatus = record.status;
+    // Optimistic update
+    setRecords(prev =>
+      prev.map(r => r.id === record.id ? { ...r, status: newStatus } : r)
+    );
+    setSyncing(prev => new Set(prev).add(record.id));
+    try {
+      const updated = await updateAttendance(record.id, newStatus);
+      setRecords(prev =>
+        prev.map(r => r.id === record.id ? updated : r)
+      );
+    } catch {
+      // Rollback
+      setRecords(prev =>
+        prev.map(r => r.id === record.id ? { ...r, status: previousStatus } : r)
+      );
+    } finally {
+      setSyncing(prev => {
+        const next = new Set(prev);
+        next.delete(record.id);
+        return next;
+      });
+    }
   };
 
   const expandAll = () => {
@@ -230,7 +258,6 @@ export default function History({ classId }: HistoryProps) {
       <div className="space-y-3">
         {filteredGroups.map(group => {
           const isExpanded = expandedDates.has(group.date);
-          const lateCount = group.records.filter(r => r.status === 'Late').length;
           const absentCount = group.records.filter(r => r.status === 'Absent').length;
 
           return (
@@ -251,11 +278,6 @@ export default function History({ classId }: HistoryProps) {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       {group.presentCount} present
                     </span>
-                    {lateCount > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                        {lateCount} late
-                      </span>
-                    )}
                     {absentCount > 0 && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         {absentCount} absent
@@ -289,6 +311,7 @@ export default function History({ classId }: HistoryProps) {
                   <tbody className="divide-y divide-gray-50">
                     {group.records.map(record => {
                       const member = record.memberId ? memberMap[record.memberId] : null;
+                      const isSyncing = syncing.has(record.id);
                       return (
                         <tr key={record.id} className="bg-white hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-2.5 text-gray-900 font-medium">
@@ -297,7 +320,33 @@ export default function History({ classId }: HistoryProps) {
                             )}
                           </td>
                           <td className="px-4 py-2.5">
-                            <StatusBadge status={record.status} />
+                            {isSyncing ? (
+                              <div className="flex items-center gap-2">
+                                <svg className="animate-spin h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                </svg>
+                                <StatusBadge status={record.status} />
+                              </div>
+                            ) : (
+                              <select
+                                value={record.status}
+                                onChange={e => changeStatus(record, e.target.value as AttendanceStatus)}
+                                className={`text-xs font-medium border rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${
+                                  record.status === 'Present'
+                                    ? 'bg-green-100 text-green-800 border-green-200'
+                                    : record.status === 'Absent'
+                                    ? 'bg-red-100 text-red-800 border-red-200'
+                                    : 'bg-amber-100 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                <option value="Present">Present</option>
+                                <option value="Absent">Absent</option>
+                                {record.status === 'Late' && (
+                                  <option value="Late">Late</option>
+                                )}
+                              </select>
+                            )}
                           </td>
                         </tr>
                       );
