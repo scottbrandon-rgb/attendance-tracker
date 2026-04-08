@@ -48,7 +48,7 @@ export default function History({ classId }: HistoryProps) {
     try {
       const [attendanceData, membersData] = await Promise.all([
         getAttendance(classId),
-        getMembers(classId),
+        getMembers(), // fetch all members regardless of current class so transferred members still resolve
       ]);
       setRecords(attendanceData);
       setMembers(membersData);
