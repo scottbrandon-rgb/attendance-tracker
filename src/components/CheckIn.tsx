@@ -296,12 +296,6 @@ export default function CheckIn({ classId }: CheckInProps) {
             onChange={e => setDate(e.target.value)}
             className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          {loadingAttendance && (
-            <svg className="animate-spin h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-            </svg>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -332,8 +326,16 @@ export default function CheckIn({ classId }: CheckInProps) {
         )}
       </div>
 
-      {/* Member list — only show unmarked members */}
-      {members.filter(m => !statusMap[m.id]).length === 0 ? (
+      {/* Member list — wait for attendance to load before rendering so statusMap is accurate */}
+      {loadingAttendance ? (
+        <div className="flex items-center justify-center py-10 text-gray-400 border border-gray-200 rounded-lg">
+          <svg className="animate-spin h-5 w-5 mr-2 text-blue-400" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          Loading attendance…
+        </div>
+      ) : members.filter(m => !statusMap[m.id]).length === 0 ? (
         <div className="text-center py-10 text-gray-500 text-sm border border-gray-200 rounded-lg">
           Everyone has been checked in for this date.
         </div>
